@@ -12,22 +12,16 @@ gravity, mass1, mass2 = 1, 100, 1
 def derivatives(time, state):
     '''
     '''
-    x1_speed, x1, x2_speed, x2, y1_speed, y1, y2_speed, y2 = state
+    x1, x2, y1, y2, x1_speed, x2_speed, y1_speed, y2_speed = state
 
     x_separation = x1 - x2
     y_separation = y1 - y2
     cubed_distance = ((x_separation)**2 + (y_separation)**2)**1.5
 
-    T = .5*(mass1 * (x1_speed**2 + y1_speed**2) + mass2 * (x2_speed**2 + y2_speed**2))
-    V = -gravity * mass1 * mass2 / np.sqrt(x_separation**2 + y_separation**2)
-
-
-    # print(T + V)
-
     x_force = -gravity * x_separation / cubed_distance
-    y_force = -gravity * mass2 * y_separation / cubed_distance
-    return (mass2 * x_force, x1_speed, -mass1 * x_force, x2_speed,
-            mass2*y_force, y1_speed, -mass1 * y_force, y2_speed)
+    y_force = -gravity * y_separation / cubed_distance
+    return (x1_speed, x2_speed, y1_speed, y2_speed, mass2 * x_force,
+            -mass1 * x_force, mass2*y_force, -mass1 * y_force)
 
 
 if __name__ == "__main__":
@@ -44,22 +38,21 @@ if __name__ == "__main__":
         'y2_speed': 0,
         'y2': -2
     }
-
-    sol = solve_ivp(derivatives, [0, 5], list(init.values()),
+    sol = solve_ivp(derivatives, [0, 5], [0, 0, 0, -2, -.05, 7, 0, 0],
                     max_step=.001)
 
-    # ax.plot(sol.y[1], sol.y[5])
-    # ax.plot(sol.y[3], sol.y[7])
+    # ax.plot(sol.y[0], sol.y[2])
+    # ax.plot(sol.y[1], sol.y[3])
 
     # plt.show()
 
     for i, t in enumerate(sol.t):
         if not i % 100:
             ax.clear()
-            ax.set_xlim(-20, 20)
-            ax.set_ylim(-20, 20)
-            ax.plot(sol.y[1][i], sol.y[5][i], 'o')
-            ax.plot(sol.y[3][i], sol.y[7][i], 'o')
+            ax.set_xlim(-10, 10)
+            ax.set_ylim(-10, 10)
+            ax.plot(sol.y[0][i], sol.y[2][i], 'o')
+            ax.plot(sol.y[1][i], sol.y[3][i], 'o')
 
             plt.pause(.001)
 
