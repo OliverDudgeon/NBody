@@ -2,36 +2,54 @@
 Numerical solutions to the 2D N-body problem
 '''
 
-from typing import List
+import os
 import json
-
+import time
+from hashlib import sha256
 from functools import partial
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 
 # Constants
+DATA_DIR = 'data'
+INDEX_FILE = 'index'
 GRAVITY = 1
+m = 4  # Number of coordinates (2 position 2 speed)
 
+file_name = 'pythag'
 
 # Functions
 
 
-def derivatives(masses: np.ndarray, time: float, state: List[float]):
+def get_vars_from_state(state):
     '''
-    * @param masses
-    * @param time current time value
-    * @param state vectorised list of variables
+    Slice state into x position, y position, x speed and y speed.
+    * @param state List of corrdinates in vector form. Length must be
+        integer multiples of 4.
     '''
-    n = len(state) // 4
+    n = len(state) // m
 
-    # Nested lists to force numpy to create 2D array so row vector can
-    # be transposed into a column vector
-    x = np.array([state[:n]])
-    y = np.array([state[n:2*n]])
+    # 2D arrays required for transposing
+    x = np.array(state[:n], ndmin=2)
+    y = np.array(state[n:2*n], ndmin=2)
 
     vx = np.array(state[2*n:3*n])
     vy = np.array(state[3*n:4*n])
+
+    return x, y, vx, vy
+
+
+def derivatives(masses, time, state):
+    '''
+    Calculate the values of the speed and acceleration of each body.
+    * @param masses
+    * @param time current time value
+    * @param state vectorised list of variables
+
+    Returns Derivatives in vectorised form
+    '''
+    x, y, vx, vy = get_vars_from_state(state)
 
     x_separation = x - x.T
     y_separation = y - y.T
@@ -49,37 +67,168 @@ def derivatives(masses: np.ndarray, time: float, state: List[float]):
                            np.sum(y_acceleration, axis=0)))
 
 
-if __name__ == "__main__":
-    fig, ax = plt.subplots()
-    ax.margins(x=0, y=0)
+def load_bodies_from_json(file_name='bodies'):
+    '''
+    Read initial conditions of bodies from json file.
+    * @param file_name name of file on system to parse
 
-    with open('bodies.json', 'r') as bodies_handler:
-        initial_values = json.loads(bodies_handler.read())
+    Returns tuple of masses and vectorised form of initial conditions
+    '''
+    with open(f'{file_name}.json', 'r') as bodies_handler:
+        dump = json.loads(bodies_handler.read())
 
-        masses = np.array([[body['m'] for body in initial_values]])
+        initial_values = dump['initial_values']
+
+        masses = np.array([body['m'] for body in initial_values],
+                          ndmin=2)
+
         x = [body['x'] for body in initial_values]
         y = [body['y'] for body in initial_values]
         v0x = [body['v0x'] for body in initial_values]
         v0y = [body['v0y'] for body in initial_values]
 
-        vectorised_initial_values = np.concatenate((x, y, v0x, v0y))
+        return (masses, np.concatenate((x, y, v0x, v0y)),
+                dump['tf'], dump['tmax'])
+
+
+def draw_bodies(masses, time, coords, *, animate=False):
+    '''
+    Plot trajectories of the bodies.
+    * @param m asses numpy array of time values
+    * @param coords numpy array of vectorised coordinates
+        - rows are the coordinate index
+        - columns are the time index
+    * @param animate whether to animate the trajectories
+    '''
+    fig, ax = plt.subplots()
+    ax.margins(x=0, y=0)
+
+    n = np.size(masses)
+
+    if animate:
+        print('Drawing...')
+        for i, t in enumerate(time):
+            if not i % 1000:
+                ax.clear()
+                ax.set_xlim(-8, 8)
+                ax.set_ylim(-8, 8)
+                for j in range(n):
+                    ax.plot(coords[j][i], coords[n + j][i], 'o')
+
+                plt.pause(.01)
+        print('Finished drawing')
+    else:
+        for j, m in enumerate(masses[0]):
+            ax.plot(coords[j], coords[n + j], label=f'm = {m}')
+        ax.legend()
+
+    ax.set_title('Trajectories')
+
+
+def draw_stats(masses, time, coords):
+    '''
+    Calculate & plot the total energy and angular momenta for all times.
+    '''
+    fig, (momenta_ax, energy_ax) = plt.subplots(ncols=2)
+    momenta_ax.margins(x=0)
+    energy_ax.margins(x=0)
+
+    x, y, vx, vy = get_vars_from_state(coords)
+
+    angular_momenta = masses.T * (y*vx - x*vy)
+    T = .5 * masses.T * (vx**2 + vy**2)
+    U = np.zeros([masses.size, time.size])
+    for j in range(len(time)):
+        x_separation = x[:, j] - x[:, j].reshape(-1, 1)
+        y_separation = y[:, j] - y[:, j].reshape(-1, 1)
+
+        np.fill_diagonal(x_separation, np.nan)
+        np.fill_diagonal(y_separation, np.nan)
+
+        Us = (masses * masses.T
+              / np.sqrt(x_separation**2 + y_separation**2))
+        np.fill_diagonal(Us, 0)
+
+        U[:, j] = -GRAVITY * np.sum(Us, axis=0)
+
+    for m, *L in np.column_stack((masses[0], angular_momenta)):
+        momenta_ax.plot(time, L, label=f'm = {m}')
+    momenta_ax.plot(time, np.sum(angular_momenta, axis=0), label='Total')
+
+    for m, *E in np.column_stack((masses[0], U + T)):
+        energy_ax.plot(time, E, label=f'm = {m}')
+    energy_ax.plot(time, np.sum(U, axis=0), label='Total')
+
+    momenta_ax.legend()
+    energy_ax.legend()
+    momenta_ax.set_title('Angular Momentum')
+    energy_ax.set_title('Total Energy')
+
+
+# Create index file if it doesn't already exist
+if not os.path.exists(f'{INDEX_FILE}.json'):
+    with open(f'{INDEX_FILE}.json', 'w'):
+        pass
+# Parse the index file
+with open('index.json') as index_handler:
+    dump_str = index_handler.read()
+    if dump_str == '':
+        index = []
+    else:
+        index = json.loads(dump_str)
+
+# Vectorise the initial values and extract parameters
+masses, initial_values, tf, tmax = load_bodies_from_json(file_name)
+
+# Hashed representation of initial values to identify if the initial
+# conditions / parameters have already been used.
+hasher = sha256()
+dat = bytes(repr(initial_values) + repr(tf) + repr(tmax), encoding='utf8')
+hasher.update(dat)
+hash_ = hasher.hexdigest()
+
+# Load the trajectory from file if it has already been solved
+# Otherwise solve with initial conditions and write to file
+if hash_ in index:
+    print('Loading trajectories from file')
+
+    with open(f'data/{hash_}_t') as sol_file_handler:
+        time = np.loadtxt(sol_file_handler)
+    with open(f'data/{hash_}_y') as sol_file_handler:
+        coords = np.loadtxt(sol_file_handler)
+else:
+    print('Calculating trajectories')
 
     d = partial(derivatives, masses)
 
-    sol = solve_ivp(d, [0, 20], vectorised_initial_values, max_step=1)
+    tic = time.time()
+    sol = solve_ivp(d, [0, tf], initial_values, max_step=tmax)
+    toc = time.time()
+    print(f'Solved in {toc - tic:g}')
+    time = sol.t
+    coords = sol.y
 
-    # ax.plot(sol.y[0], sol.y[3])
-    # ax.plot(sol.y[1], sol.y[4])
-    # ax.plot(sol.y[2], sol.y[5])
+    # Create data directory if it doesn't exist
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+    with open(f'data/{hash_}_t', 'w+') as sol_file_handler:
+        np.savetxt(sol_file_handler, sol.t, fmt="%.8f")
+    with open(f'data/{hash_}_y', 'w+') as sol_file_handler:
+        np.savetxt(sol_file_handler, sol.y, fmt="%.8f")
 
-    for i, t in enumerate(sol.t):
-        ax.clear()
-        ax.set_xlim(-15, 15)
-        ax.set_ylim(-15, 15)
-        n = len(initial_values)
-        for j in range(n):
-            ax.plot(sol.y[j][i], sol.y[j + n][i], 'o')
+    with open(f'index.json') as index_handler:
+        dump_str = index_handler.read()
 
-        plt.pause(.001)
+    if dump_str == '':
+        index = [hash_]
+    else:
+        index = json.loads(dump_str)
+        index.append(hash_)
+    with open(f'index.json', 'w+') as index_handler:
+        json.dump(index, index_handler)
 
-    # plt.show()
+
+draw_bodies(masses, time, coords, animate=True)
+draw_stats(masses, time, coords)
+
+# plt.show()

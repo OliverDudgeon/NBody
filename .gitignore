@@ -1,2 +1,7 @@
 .vscode/
 .mypy_cache/
+.DS_Store
+.ipynb_checkpoints/
+__pycache__/
+data/
+index.json
