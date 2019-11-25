@@ -16,5 +16,6 @@
     "tuples",
     "xlim",
     "ylim"
-  ]
+  ],
+  "python.linting.flake8Enabled": false
 }

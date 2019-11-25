@@ -5,8 +5,6 @@ import json
 from hashlib import sha256
 import numpy as np
 
-hasher = sha256()
-
 
 def create_index(index_file):
     '''Create index file if it doesn't already exist.'''
@@ -38,6 +36,7 @@ def get_hash(initial_values, tf, tmax):
     In order to identify if the initial conditions / parameters have
     already been used.
     '''
+    hasher = sha256()
     dat = bytes(repr(initial_values) + repr(tf) + repr(tmax),
                 encoding='utf8')
     hasher.update(dat)
@@ -55,12 +54,12 @@ def load_data(data_dir, hash_):
 
 def write_data(hash_, data_dir, times, coords, *, prec=8):
     '''Write times and coords data to data dir.'''
-    print(f'Writing times data to data/{hash_[:10]}...')
+    print(f'Writing times data to data/{hash_[:15]}...')
     with open(f'{data_dir}/{hash_}_t', 'w+') as sol_file_handler:
         np.savetxt(sol_file_handler, times, fmt=f'%.{prec}f')
     print('Finished writing times data')
 
-    print(f'Writing coordinates to data/{hash_[:10]}...')
+    print(f'Writing coordinates to data/{hash_[:15]}...')
     with open(f'{data_dir}/{hash_}_y', 'w+') as sol_file_handler:
         np.savetxt(sol_file_handler, coords, fmt=f'%.{prec}f')
     print('Finished writing coordinates data')

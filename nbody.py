@@ -12,13 +12,16 @@ from scipy.integrate import solve_ivp
 from caching import *
 
 # Constants
+FILE_NAME = 'pythag'
+
 DATA_DIR = 'data'
 INDEX_FILE = 'index'
-GRAVITY = 1
-m = 4  # Number of coordinates (2 position 2 speed)
-FRAMERATE = 60
 
-FILE_NAME = 'pythag'
+GRAVITY = 1
+
+m = 4  # Number of coordinates (2 position 2 speed)
+FRAMERATE = 60  # Number of data points to be saved per unit time
+
 
 # Functions
 
@@ -92,7 +95,7 @@ def load_bodies_from_json(file_name='bodies'):
                 dump['tf'], dump['tmax'])
 
 
-def draw_bodies(masses, times, coords, *, tf, animate=False):
+def draw_bodies(masses, times, coords, *, tf=None, animate=False):
     '''
     Plot trajectories of the bodies.
     * @param m asses numpy array of time values
@@ -105,6 +108,9 @@ def draw_bodies(masses, times, coords, *, tf, animate=False):
     ax.margins(x=0, y=0)
 
     n = np.size(masses)
+
+    if animate and tf is None:
+        raise ValueError('Provide duration tf to animate')
 
     if animate:
         print('Drawing...')
@@ -181,10 +187,10 @@ def solve_for(file_name):
     # Load the trajectory from file if it has already been solved
     # Otherwise solve with initial conditions and write to file
     if hash_ in parse_index(INDEX_FILE):
-        print('Loading trajectories from file')
+        print('Loading trajectories from file...')
         times, coords = load_data(DATA_DIR, hash_)
     else:
-        print('Calculating trajectories')
+        print('Calculating trajectories...')
 
         d = partial(derivatives, masses)
 
@@ -207,9 +213,11 @@ def solve_for(file_name):
 
 
 if __name__ == '__main__':
-    masses, times, coords, tf = solve_for(FILE_NAME)
+    # file_name = input('Initial values file name: ')
+    file_name = FILE_NAME
+    masses, times, coords, tf = solve_for(file_name)
 
     draw_bodies(masses, times, coords, tf=tf, animate=True)
     draw_stats(masses, times, coords)
 
-    # plt.show()
+    plt.show()
