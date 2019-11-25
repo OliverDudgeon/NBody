@@ -2,14 +2,14 @@
 Numerical solutions to the 2D N-body problem
 '''
 
-import os
 import json
 import time
-from hashlib import sha256
 from functools import partial
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
+
+from caching import *
 
 # Constants
 DATA_DIR = 'data'
@@ -18,7 +18,7 @@ GRAVITY = 1
 m = 4  # Number of coordinates (2 position 2 speed)
 FRAMERATE = 60
 
-file_name = 'pythag'
+FILE_NAME = 'pythag'
 
 # Functions
 
@@ -171,82 +171,45 @@ def draw_stats(masses, times, coords):
     energy_ax.set_title('Total Energy')
 
 
-# Create index file if it doesn't already exist
-if not os.path.exists(f'{INDEX_FILE}.json'):
-    with open(f'{INDEX_FILE}.json', 'w'):
-        pass
+def solve_for(file_name):
+    '''Solves the N-body problem for initial values in json file.'''
+    # Vectorise the initial values and extract parameters
+    masses, initial_values, tf, tmax = load_bodies_from_json(file_name)
 
-# Parse the index file
-with open('index.json') as index_handler:
-    dump_str = index_handler.read()
-    if dump_str == '':
-        index = []
+    hash_ = get_hash(initial_values, tf, tmax)
+
+    # Load the trajectory from file if it has already been solved
+    # Otherwise solve with initial conditions and write to file
+    if hash_ in parse_index(INDEX_FILE):
+        print('Loading trajectories from file')
+        times, coords = load_data(DATA_DIR, hash_)
     else:
-        index = json.loads(dump_str)
+        print('Calculating trajectories')
 
-# Vectorise the initial values and extract parameters
-masses, initial_values, tf, tmax = load_bodies_from_json(file_name)
+        d = partial(derivatives, masses)
 
-# Hashed representation of initial values to identify if the initial
-# conditions / parameters have already been used.
-hasher = sha256()
-dat = bytes(repr(initial_values) + repr(tf) + repr(tmax), encoding='utf8')
-hasher.update(dat)
-hash_ = hasher.hexdigest()
+        tic = time.time()
+        sol = solve_ivp(d, [0, tf], initial_values, max_step=tmax)
+        toc = time.time()
+        print(f'Solved in {toc - tic:g}')
 
-# Load the trajectory from file if it has already been solved
-# Otherwise solve with initial conditions and write to file
-if hash_ in index:
-    print('Loading trajectories from file')
+        times = sol.t
+        coords = sol.y
 
-    with open(f'data/{hash_}_t') as sol_file_handler:
-        times = np.loadtxt(sol_file_handler)
-    with open(f'data/{hash_}_y') as sol_file_handler:
-        coords = np.loadtxt(sol_file_handler)
-else:
-    print('Calculating trajectories')
+        num_points = FRAMERATE * tf
+        step = len(sol.t) // num_points
 
-    d = partial(derivatives, masses)
+        create_data_dir(DATA_DIR)
+        write_data(hash_, DATA_DIR, times, coords)
+        update_index(INDEX_FILE, hash_)
 
-    tic = time.time()
-    sol = solve_ivp(d, [0, tf], initial_values, max_step=tmax)
-    toc = time.time()
-    print(f'Solved in {toc - tic:g}')
-
-    times = sol.t
-    coords = sol.y
-
-    print(coords.shape)
-
-    num_points = FRAMERATE * tf
-    step = len(sol.t) // num_points
-
-    # Create data directory if it doesn't exist
-    if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR)
-
-    print(f'Writing times data to data/{hash_[:10]}...')
-    with open(f'data/{hash_}_t', 'w+') as sol_file_handler:
-        np.savetxt(sol_file_handler, sol.t[::step], fmt="%.8f")
-    print('Finished writing times data')
-    print(f'Writing coordinates to data/{hash_[:10]}...')
-    with open(f'data/{hash_}_y', 'w+') as sol_file_handler:
-        np.savetxt(sol_file_handler, sol.y[:, ::step], fmt="%.8f")
-    print('Finished writing coordinates data')
-
-    with open(f'index.json') as index_handler:
-        dump_str = index_handler.read()
-    if dump_str == '':
-        index = [hash_]
-    else:
-        index = json.loads(dump_str)
-        index.append(hash_)
-    with open(f'index.json', 'w+') as index_handler:
-        json.dump(index, index_handler)
-    print('Updated index')
+    return masses, times, coords, tf
 
 
-draw_bodies(masses, times, coords, tf=tf, animate=True)
-draw_stats(masses, times, coords)
+if __name__ == '__main__':
+    masses, times, coords, tf = solve_for(FILE_NAME)
 
-# plt.show()
+    draw_bodies(masses, times, coords, tf=tf, animate=True)
+    draw_stats(masses, times, coords)
+
+    # plt.show()

@@ -8,6 +8,7 @@
     "ncols",
     "ndarray",
     "ndmin",
+    "prec",
     "pythag",
     "savetxt",
     "stats",
