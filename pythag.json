@@ -1,5 +1,5 @@
 {
-  "tmax": 0.0001,
+  "tmax": 0.00001,
   "tf": 20,
   "initial_values": [
     {

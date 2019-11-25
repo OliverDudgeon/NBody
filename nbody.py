@@ -16,6 +16,7 @@ DATA_DIR = 'data'
 INDEX_FILE = 'index'
 GRAVITY = 1
 m = 4  # Number of coordinates (2 position 2 speed)
+FRAMERATE = 60
 
 file_name = 'pythag'
 
@@ -91,7 +92,7 @@ def load_bodies_from_json(file_name='bodies'):
                 dump['tf'], dump['tmax'])
 
 
-def draw_bodies(masses, time, coords, *, animate=False):
+def draw_bodies(masses, times, coords, *, tf, animate=False):
     '''
     Plot trajectories of the bodies.
     * @param m asses numpy array of time values
@@ -107,15 +108,20 @@ def draw_bodies(masses, time, coords, *, animate=False):
 
     if animate:
         print('Drawing...')
-        for i, t in enumerate(time):
-            if not i % 1000:
-                ax.clear()
-                ax.set_xlim(-8, 8)
-                ax.set_ylim(-8, 8)
-                for j in range(n):
-                    ax.plot(coords[j][i], coords[n + j][i], 'o')
 
-                plt.pause(.01)
+        tic = time.time()
+        toc = tic
+        while toc - tic < tf:
+            ax.clear()
+            ax.set_xlim(-8, 8)
+            ax.set_ylim(-8, 8)
+
+            idx = int(len(times) * (toc - tic) / tf)
+            for j in range(n):
+                ax.plot(coords[j][idx], coords[n + j][idx], 'o')
+
+            plt.pause(.03)
+            toc = time.time()
         print('Finished drawing')
     else:
         for j, m in enumerate(masses[0]):
@@ -125,7 +131,7 @@ def draw_bodies(masses, time, coords, *, animate=False):
     ax.set_title('Trajectories')
 
 
-def draw_stats(masses, time, coords):
+def draw_stats(masses, times, coords):
     '''
     Calculate & plot the total energy and angular momenta for all times.
     '''
@@ -137,8 +143,8 @@ def draw_stats(masses, time, coords):
 
     angular_momenta = masses.T * (y*vx - x*vy)
     T = .5 * masses.T * (vx**2 + vy**2)
-    U = np.zeros([masses.size, time.size])
-    for j in range(len(time)):
+    U = np.zeros([masses.size, times.size])
+    for j in range(len(times)):
         x_separation = x[:, j] - x[:, j].reshape(-1, 1)
         y_separation = y[:, j] - y[:, j].reshape(-1, 1)
 
@@ -152,12 +158,12 @@ def draw_stats(masses, time, coords):
         U[:, j] = -GRAVITY * np.sum(Us, axis=0)
 
     for m, *L in np.column_stack((masses[0], angular_momenta)):
-        momenta_ax.plot(time, L, label=f'm = {m}')
-    momenta_ax.plot(time, np.sum(angular_momenta, axis=0), label='Total')
+        momenta_ax.plot(times, L, label=f'm = {m}')
+    momenta_ax.plot(times, np.sum(angular_momenta, axis=0), label='Total')
 
     for m, *E in np.column_stack((masses[0], U + T)):
-        energy_ax.plot(time, E, label=f'm = {m}')
-    energy_ax.plot(time, np.sum(U, axis=0), label='Total')
+        energy_ax.plot(times, E, label=f'm = {m}')
+    energy_ax.plot(times, np.sum(U, axis=0), label='Total')
 
     momenta_ax.legend()
     energy_ax.legend()
@@ -169,6 +175,7 @@ def draw_stats(masses, time, coords):
 if not os.path.exists(f'{INDEX_FILE}.json'):
     with open(f'{INDEX_FILE}.json', 'w'):
         pass
+
 # Parse the index file
 with open('index.json') as index_handler:
     dump_str = index_handler.read()
@@ -193,7 +200,7 @@ if hash_ in index:
     print('Loading trajectories from file')
 
     with open(f'data/{hash_}_t') as sol_file_handler:
-        time = np.loadtxt(sol_file_handler)
+        times = np.loadtxt(sol_file_handler)
     with open(f'data/{hash_}_y') as sol_file_handler:
         coords = np.loadtxt(sol_file_handler)
 else:
@@ -205,20 +212,30 @@ else:
     sol = solve_ivp(d, [0, tf], initial_values, max_step=tmax)
     toc = time.time()
     print(f'Solved in {toc - tic:g}')
-    time = sol.t
+
+    times = sol.t
     coords = sol.y
+
+    print(coords.shape)
+
+    num_points = FRAMERATE * tf
+    step = len(sol.t) // num_points
 
     # Create data directory if it doesn't exist
     if not os.path.exists(DATA_DIR):
         os.makedirs(DATA_DIR)
+
+    print(f'Writing times data to data/{hash_[:10]}...')
     with open(f'data/{hash_}_t', 'w+') as sol_file_handler:
-        np.savetxt(sol_file_handler, sol.t, fmt="%.8f")
+        np.savetxt(sol_file_handler, sol.t[::step], fmt="%.8f")
+    print('Finished writing times data')
+    print(f'Writing coordinates to data/{hash_[:10]}...')
     with open(f'data/{hash_}_y', 'w+') as sol_file_handler:
-        np.savetxt(sol_file_handler, sol.y, fmt="%.8f")
+        np.savetxt(sol_file_handler, sol.y[:, ::step], fmt="%.8f")
+    print('Finished writing coordinates data')
 
     with open(f'index.json') as index_handler:
         dump_str = index_handler.read()
-
     if dump_str == '':
         index = [hash_]
     else:
@@ -226,9 +243,10 @@ else:
         index.append(hash_)
     with open(f'index.json', 'w+') as index_handler:
         json.dump(index, index_handler)
+    print('Updated index')
 
 
-draw_bodies(masses, time, coords, animate=True)
-draw_stats(masses, time, coords)
+draw_bodies(masses, times, coords, tf=tf, animate=True)
+draw_stats(masses, times, coords)
 
 # plt.show()

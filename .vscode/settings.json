@@ -1,0 +1,19 @@
+{
+  "python.linting.pylintEnabled": false,
+  "python.linting.mypyEnabled": false,
+  "python.linting.enabled": true,
+  "python.linting.pycodestyleEnabled": true,
+  "cSpell.words": [
+    "loadtxt",
+    "ncols",
+    "ndarray",
+    "ndmin",
+    "pythag",
+    "savetxt",
+    "stats",
+    "tmax",
+    "tuples",
+    "xlim",
+    "ylim"
+  ]
+}
