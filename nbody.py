@@ -12,7 +12,7 @@ from scipy.integrate import solve_ivp
 from caching import *
 
 # Constants
-FILE_NAME = 'pythag'
+FILE_NAME = 'figureeight'
 
 DATA_DIR = 'data'
 INDEX_FILE = 'index'
@@ -95,7 +95,7 @@ def load_bodies_from_json(file_name='bodies'):
                 dump['tf'], dump['tmax'])
 
 
-def draw_bodies(masses, times, coords, *, tf=None, animate=False):
+def draw_bodies(masses, times, coords, *, tf=None, animate=False, ax=None, fig=None):
     '''
     Plot trajectories of the bodies.
     * @param m asses numpy array of time values
@@ -104,7 +104,8 @@ def draw_bodies(masses, times, coords, *, tf=None, animate=False):
         - columns are the time index
     * @param animate whether to animate the trajectories
     '''
-    fig, ax = plt.subplots()
+    if ax is None or fig is None:
+        fig, ax = plt.subplots()
     ax.margins(x=0, y=0)
 
     n = np.size(masses)
@@ -115,12 +116,11 @@ def draw_bodies(masses, times, coords, *, tf=None, animate=False):
     if animate:
         print('Drawing...')
 
-        tic = time.time()
-        toc = tic
+        toc = tic = time.time()
         while toc - tic < tf:
             ax.clear()
-            ax.set_xlim(-8, 8)
-            ax.set_ylim(-8, 8)
+            ax.set_xlim(-2, 2)
+            ax.set_ylim(-2, 2)
 
             idx = int(len(times) * (toc - tic) / tf)
             for j in range(n):
