@@ -137,11 +137,14 @@ def draw_bodies(masses, times, coords, *, tf=None, animate=False, ax=None, fig=N
     ax.set_title('Trajectories')
 
 
-def draw_stats(masses, times, coords):
+def draw_stats(masses, times, coords, *, axs=None, fig=None):
     '''
     Calculate & plot the total energy and angular momenta for all times.
     '''
-    fig, (momenta_ax, energy_ax) = plt.subplots(ncols=2)
+    if axs is None or fig is None:
+        fig, (momenta_ax, energy_ax) = plt.subplots(ncols=2)
+    else:
+        momenta_ax, energy_ax = axs
     momenta_ax.margins(x=0)
     energy_ax.margins(x=0)
 
