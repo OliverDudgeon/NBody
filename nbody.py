@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 
 from caching import *
+from tools import pprint
 
 # Constants
 FILE_NAME = 'figureeight'
@@ -19,7 +20,8 @@ INDEX_FILE = 'index'
 
 GRAVITY = 1
 
-m = 4  # Number of coordinates (2 position 2 speed)
+d = 3
+m = 2*d  # Number of coordinates (2 position 2 speed)
 FRAMERATE = 60  # Number of data points to be saved per unit time
 
 
@@ -28,20 +30,17 @@ FRAMERATE = 60  # Number of data points to be saved per unit time
 
 def get_vars_from_state(state):
     '''
-    Slice state into x position, y position, x speed and y speed.
+    Slice state into coords and speeds.
+    Coords and speed are split into x, y, z components within the lists.
     * @param state List of corrdinates in vector form. Length must be
-        integer multiples of 4.
+        integer multiples of m.
     '''
     n = len(state) // m
 
-    # 2D arrays required for transposing
-    x = np.array(state[:n], ndmin=2)
-    y = np.array(state[n:2*n], ndmin=2)
+    coords = np.split(np.array(state[:len(state) // 2]), n)
+    speeds = np.split(np.array(state[len(state) // 2:]), n)
 
-    vx = np.array(state[2*n:3*n])
-    vy = np.array(state[3*n:4*n])
-
-    return x, y, vx, vy
+    return coords, speeds
 
 
 def derivatives(masses, time, state):
@@ -53,22 +52,27 @@ def derivatives(masses, time, state):
 
     Returns Derivatives in vectorised form
     '''
-    x, y, vx, vy = get_vars_from_state(state)
+    (x, y, z), (vx, vy, vz) = get_vars_from_state(state)
 
     x_separation = x - x.T
     y_separation = y - y.T
+    z_separation = z - z.T
 
-    cubed_separation = (x_separation**2 + y_separation**2)**1.5
+    cubed_separation = (x_separation**2 + y_separation **
+                        2 + z_separation**2)**1.5
     np.fill_diagonal(cubed_separation, np.nan)
 
     x_acceleration = -GRAVITY * masses.T * x_separation / cubed_separation
     y_acceleration = -GRAVITY * masses.T * y_separation / cubed_separation
+    z_acceleration = -GRAVITY * masses.T * z_separation / cubed_separation
 
     np.fill_diagonal(x_acceleration, 0)
     np.fill_diagonal(y_acceleration, 0)
+    np.fill_diagonal(z_acceleration, 0)
 
-    return np.concatenate((vx, vy, np.sum(x_acceleration, axis=0),
-                           np.sum(y_acceleration, axis=0)))
+    return np.concatenate((vx, vy, vz, np.sum(x_acceleration, axis=0),
+                           np.sum(y_acceleration, axis=0),
+                           np.sum(z_acceleration, axis=0)))
 
 
 def load_bodies_from_json(file_name='bodies'):
@@ -88,10 +92,12 @@ def load_bodies_from_json(file_name='bodies'):
 
         x = [body['x'] for body in initial_values]
         y = [body['y'] for body in initial_values]
+        z = [body['z'] for body in initial_values]
         v0x = [body['v0x'] for body in initial_values]
         v0y = [body['v0y'] for body in initial_values]
+        v0z = [body['v0z'] for body in initial_values]
 
-        return (masses, np.concatenate((x, y, v0x, v0y)),
+        return (masses, np.concatenate((x, y, z, v0x, v0y, v0z)),
                 dump['tf'], dump['tmax'])
 
 
@@ -148,27 +154,39 @@ def draw_stats(masses, times, coords, *, axs=None, fig=None):
     momenta_ax.margins(x=0)
     energy_ax.margins(x=0)
 
-    x, y, vx, vy = get_vars_from_state(coords)
+    (x, y, z), (vx, vy, vz) = get_vars_from_state(coords)
 
-    angular_momenta = masses.T * (y*vx - x*vy)
-    T = .5 * masses.T * (vx**2 + vy**2)
+    coords = np.array([x, y, z])
+    momenta = masses.T * np.array([vx, vy, vz])
+
+    L = np.cross(coords, momenta, axis=0)
+
+    # Calculate angular momenta as L = r x p where r, p are 3D arrays
+    tot_ang_mom = angular_momenta = np.sqrt(np.sum(np.cross(coords,
+                                                            momenta,
+                                                            axis=0)**2,
+                                                   axis=0))
+
+    T = .5 * masses.T * (vx**2 + vy**2 + vz**2)
     U = np.zeros([masses.size, times.size])
     for j in range(len(times)):
         x_separation = x[:, j] - x[:, j].reshape(-1, 1)
         y_separation = y[:, j] - y[:, j].reshape(-1, 1)
+        z_separation = z[:, j] - z[:, j].reshape(-1, 1)
 
         np.fill_diagonal(x_separation, np.nan)
         np.fill_diagonal(y_separation, np.nan)
+        np.fill_diagonal(z_separation, np.nan)
 
         Us = (masses * masses.T
-              / np.sqrt(x_separation**2 + y_separation**2))
+              / np.sqrt(x_separation**2 + y_separation**2 + z_separation**2))
         np.fill_diagonal(Us, 0)
 
         U[:, j] = -GRAVITY * np.sum(Us, axis=0)
 
-    for m, *L in np.column_stack((masses[0], angular_momenta)):
+    for m, *L in np.column_stack((masses[0], tot_ang_mom)):
         momenta_ax.plot(times, L, label=f'm = {m}')
-    momenta_ax.plot(times, np.sum(angular_momenta, axis=0), label='Total')
+    momenta_ax.plot(times, np.sum(tot_ang_mom, axis=0), label='Total')
 
     for m, *E in np.column_stack((masses[0], U + T)):
         energy_ax.plot(times, E, label=f'm = {m}')
@@ -220,7 +238,7 @@ if __name__ == '__main__':
     file_name = FILE_NAME
     masses, times, coords, tf = solve_for(file_name)
 
-    draw_bodies(masses, times, coords, tf=tf, animate=True)
+    # draw_bodies(masses, times, coords, tf=tf, animate=True)
     draw_stats(masses, times, coords)
 
     plt.show()
