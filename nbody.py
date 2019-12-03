@@ -135,7 +135,8 @@ def draw_bodies(masses, times, coords, *, tf=None, animate=False, ax=None, fig=N
     ax.set_title('Trajectories')
 
 
-def draw_stats(masses, times, coords, *, axs=None, fig=None):
+def draw_stats(masses, times, state, *, rel_L=True, rel_E=True,
+               axs=None, fig=None):
     '''
     Calculate & plot the total energy and angular momenta for all times.
     '''
@@ -148,34 +149,35 @@ def draw_stats(masses, times, coords, *, axs=None, fig=None):
 
     n = masses.size
 
-    x, y, z, vx, vy, vz = np.split(coords, 2*d)
+    x, y, z, vx, vy, vz = np.split(state, 2*d)
+    r = np.array([x, y, z])
+    speeds = np.array([vx, vy, vz])
 
-    Lx = masses.T * (y*vz - z*vy)
-    Ly = masses.T * (z*vx - y*vz)
-    Lz = masses.T * (y*vx - x*vy)
-    L = np.sqrt(np.sum(Lx, axis=0)**2 + np.sum(Ly, axis=0)**2 + np.sum(Ly, axis=0)**2)
+    Ls = np.cross(r, masses.T * speeds, axis=0)
+    L_tot = np.sum(Ls, axis=1)
+
+    T = .5 * masses.T * np.sum(speeds**2, axis=0)
 
     U = np.zeros([n, len(times)])
-    T = .5 * masses.T * (vx**2 + vy**2 + vz**2)
-
     for j in range(len(times)):
-        x_sep = x[:, j] - x[:, j].reshape(-1, 1)
-        y_sep = y[:, j] - y[:, j].reshape(-1, 1)
-        z_sep = z[:, j] - z[:, j].reshape(-1, 1)
+        sep = [pos[:, j] - pos[:, j].reshape(-1, 1) for pos in r]
+        for s in sep:
+            np.fill_diagonal(s, np.inf)
 
-        np.fill_diagonal(x_sep, np.inf)
-        np.fill_diagonal(y_sep, np.inf)
-        np.fill_diagonal(z_sep, np.inf)
-
-        Us = (masses * masses.T
-              / np.sqrt(x_sep**2 + y_sep**2 + z_sep**2))
-
+        Us = masses * masses.T / np.sqrt(sum(s**2 for s in sep))
         U[:, j] = -GRAVITY * np.sum(np.triu(Us), axis=0)
 
-    momenta_ax.plot(times, L, label='Total')
+    L = np.sqrt(np.sum(L_tot**2, axis=0))
+    if rel_L:
+        momenta_ax.plot(times, L / L[0] - 1, label='$L / L_0 - 1$')
+    else:
+        momenta_ax.plot(times, L, label='$L$')
 
     E = np.sum(U + T, axis=0)
-    energy_ax.plot(times, E / E[0] - 1, label='$E / E_0 - 1$')
+    if rel_E:
+        energy_ax.plot(times, E / E[0] - 1, label='$E / E_0 - 1$')
+    else:
+        energy_ax.plot(times, E, label='$E$')
 
     momenta_ax.legend()
     energy_ax.legend()
@@ -225,6 +227,6 @@ if __name__ == '__main__':
     masses, times, coords, tf = solve_for(file_name)
 
     # draw_bodies(masses, times, coords, tf=tf, animate=True)
-    draw_stats(masses, times, coords)
+    draw_stats(masses, times, coords, rel_L=False)
 
     plt.show()
