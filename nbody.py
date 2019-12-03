@@ -26,20 +26,17 @@ FRAMERATE = 60  # Number of data points to be saved per unit time
 
 
 # Functions
-
-
 def get_vars_from_state(state):
     '''
     Slice state into coords and speeds.
     Coords and speed are split into x, y, z components within the lists.
-    * @param state List of corrdinates in vector form. Length must be
+    * @param state Array of corrdinates in vector form. Length must be
         integer multiples of m.
+
+    Returns Tuple of a positions list values and a speeds list
     '''
-
-    coords = np.split(np.array(state[:len(state) // 2]), d)
-    speeds = np.split(np.array(state[len(state) // 2:]), d)
-
-    return coords, speeds
+    coords = np.split(state, 2*d)
+    return coords[:d], coords[d:2*d]
 
 
 def derivatives(masses, time, state):
@@ -76,31 +73,34 @@ def load_bodies_from_json(file_name='bodies'):
     with open(f'{file_name}.json', 'r') as bodies_handler:
         dump = json.loads(bodies_handler.read())
 
-        initial_values = dump['initial_values']
+    initial_values = dump['initial_values']
 
-        masses = np.array([body['m'] for body in initial_values],
-                          ndmin=2)
+    masses = np.array([body['m'] for body in initial_values], ndmin=2)
 
-        x = [body['x'] for body in initial_values]
-        y = [body['y'] for body in initial_values]
-        z = [body['z'] for body in initial_values]
-        v0x = [body['v0x'] for body in initial_values]
-        v0y = [body['v0y'] for body in initial_values]
-        v0z = [body['v0z'] for body in initial_values]
+    coord_names = ['x', 'y', 'z', 'v0x', 'v0y', 'v0z']
 
-        return (masses, np.concatenate((x, y, z, v0x, v0y, v0z)),
-                dump['tf'], dump['tmax'])
+    initial_state = [[body[name] for body in initial_values]
+                     for name in coord_names]
+
+    return masses, np.concatenate(initial_state), dump['tf'], dump['tmax']
 
 
-def draw_bodies(masses, times, coords, *, tf=None, animate=False, ax=None, fig=None):
+def draw_bodies(masses, times, coords, *,
+                animate=False, tf=None, ax=None, fig=None):
     '''
     Plot trajectories of the bodies.
-    * @param m asses numpy array of time values
+    * @param masses numpy array of the masses
+    * @param times numpy array of time values
     * @param coords numpy array of vectorised coordinates
         - rows are the coordinate index
         - columns are the time index
     * @param animate whether to animate the trajectories
+    * @param tf duration of animation
+    * @param ax axis to plot onto
+    * @param fig figure window to redraw
     '''
+
+    x, y, z, *_ = np.split(coords, 2*d)
 
     if ax is None or fig is None:
         fig, ax = plt.subplots()
@@ -117,12 +117,14 @@ def draw_bodies(masses, times, coords, *, tf=None, animate=False, ax=None, fig=N
         toc = tic = time.time()
         while toc - tic < tf:
             ax.clear()
-            ax.set_xlim(-2, 2)
-            ax.set_ylim(-2, 2)
+            ax.set_xlim(np.min(x), np.max(x))
+            ax.set_ylim(np.min(y), np.max(y))
 
             idx = int(len(times) * (toc - tic) / tf)
             for j in range(n):
-                ax.plot(coords[j][idx], coords[n + j][idx], 'o')
+                l, = ax.plot(x[j][:idx], y[j][:idx])
+                ax.plot(coords[j][idx], coords[n + j][idx], marker='o',
+                        c=l.get_c())
 
             plt.pause(.03)
             toc = time.time()
@@ -139,6 +141,15 @@ def draw_stats(masses, times, state, *, rel_L=True, rel_E=True,
                axs=None, fig=None):
     '''
     Calculate & plot the total energy and angular momenta for all times.
+    * @param masses numpy array of the masses
+    * @param times numpy array of time values
+    * @param coords numpy array of vectorised coordinates
+        - rows are the coordinate index
+        - columns are the time index
+    * @param rel_L whether to plot angular momentum relative to the first value
+    * @param rel_E whether to plot total energy relative to the first value
+    * @param ax axes to plot onto. First momenta, second energy
+    * @param fig figure window to redraw
     '''
     if axs is None or fig is None:
         fig, (momenta_ax, energy_ax) = plt.subplots(ncols=2)
@@ -186,7 +197,11 @@ def draw_stats(masses, times, state, *, rel_L=True, rel_E=True,
 
 
 def solve_for(file_name, calc=False):
-    '''Solves the N-body problem for initial values in json file.'''
+    '''
+    Solves the N-body problem for initial values in json file.
+    * @param file_name name of file without extension to get initial value from
+    * @param Just (re)calculate even if there is a cashed version
+    '''
     # Vectorise the initial values and extract parameters
     masses, initial_values, tf, tmax = load_bodies_from_json(file_name)
 
@@ -226,7 +241,7 @@ if __name__ == '__main__':
     file_name = FILE_NAME
     masses, times, coords, tf = solve_for(file_name)
 
-    # draw_bodies(masses, times, coords, tf=tf, animate=True)
-    draw_stats(masses, times, coords, rel_L=False)
+    draw_bodies(masses, times, coords, tf=tf, animate=True)
+    # draw_stats(masses, times, coords, rel_L=False)
 
     plt.show()
