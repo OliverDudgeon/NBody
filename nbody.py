@@ -35,10 +35,9 @@ def get_vars_from_state(state):
     * @param state List of corrdinates in vector form. Length must be
         integer multiples of m.
     '''
-    n = len(state) // m
 
-    coords = np.split(np.array(state[:len(state) // 2]), n)
-    speeds = np.split(np.array(state[len(state) // 2:]), n)
+    coords = np.split(np.array(state[:len(state) // 2]), d)
+    speeds = np.split(np.array(state[len(state) // 2:]), d)
 
     return coords, speeds
 
@@ -52,27 +51,19 @@ def derivatives(masses, time, state):
 
     Returns Derivatives in vectorised form
     '''
-    (x, y, z), (vx, vy, vz) = get_vars_from_state(state)
+    coords, speeds = get_vars_from_state(state)
 
-    x_separation = x - x.T
-    y_separation = y - y.T
-    z_separation = z - z.T
+    separations = np.array([q - np.array([q]).T for q in coords])
 
-    cubed_separation = (x_separation**2 + y_separation **
-                        2 + z_separation**2)**1.5
-    np.fill_diagonal(cubed_separation, np.nan)
+    cubed_separation = np.sum(separations**2, axis=0)**1.5
+    np.fill_diagonal(cubed_separation, np.inf)
 
-    x_acceleration = -GRAVITY * masses.T * x_separation / cubed_separation
-    y_acceleration = -GRAVITY * masses.T * y_separation / cubed_separation
-    z_acceleration = -GRAVITY * masses.T * z_separation / cubed_separation
+    acceleration = (-GRAVITY
+                    * masses
+                    * np.sum(separations / cubed_separation, axis=1))
 
-    np.fill_diagonal(x_acceleration, 0)
-    np.fill_diagonal(y_acceleration, 0)
-    np.fill_diagonal(z_acceleration, 0)
-
-    return np.concatenate((vx, vy, vz, np.sum(x_acceleration, axis=0),
-                           np.sum(y_acceleration, axis=0),
-                           np.sum(z_acceleration, axis=0)))
+    return np.concatenate([*speeds,
+                           acceleration.reshape(acceleration.size)])
 
 
 def load_bodies_from_json(file_name='bodies'):
@@ -110,6 +101,7 @@ def draw_bodies(masses, times, coords, *, tf=None, animate=False, ax=None, fig=N
         - columns are the time index
     * @param animate whether to animate the trajectories
     '''
+
     if ax is None or fig is None:
         fig, ax = plt.subplots()
     ax.margins(x=0, y=0)
@@ -154,43 +146,36 @@ def draw_stats(masses, times, coords, *, axs=None, fig=None):
     momenta_ax.margins(x=0)
     energy_ax.margins(x=0)
 
-    (x, y, z), (vx, vy, vz) = get_vars_from_state(coords)
+    n = masses.size
 
-    coords = np.array([x, y, z])
-    momenta = masses.T * np.array([vx, vy, vz])
+    x, y, z, vx, vy, vz = np.split(coords, 2*d)
 
-    L = np.cross(coords, momenta, axis=0)
+    Lx = masses.T * (y*vz - z*vy)
+    Ly = masses.T * (z*vx - y*vz)
+    Lz = masses.T * (y*vx - x*vy)
+    L = np.sqrt(np.sum(Lx, axis=0)**2 + np.sum(Ly, axis=0)**2 + np.sum(Ly, axis=0)**2)
 
-    # Calculate angular momenta as L = r x p where r, p are 3D arrays
-    tot_ang_mom = angular_momenta = np.sqrt(np.sum(np.cross(coords,
-                                                            momenta,
-                                                            axis=0)**2,
-                                                   axis=0))
-
+    U = np.zeros([n, len(times)])
     T = .5 * masses.T * (vx**2 + vy**2 + vz**2)
-    U = np.zeros([masses.size, times.size])
-    for j in range(len(times)):
-        x_separation = x[:, j] - x[:, j].reshape(-1, 1)
-        y_separation = y[:, j] - y[:, j].reshape(-1, 1)
-        z_separation = z[:, j] - z[:, j].reshape(-1, 1)
 
-        np.fill_diagonal(x_separation, np.nan)
-        np.fill_diagonal(y_separation, np.nan)
-        np.fill_diagonal(z_separation, np.nan)
+    for j in range(len(times)):
+        x_sep = x[:, j] - x[:, j].reshape(-1, 1)
+        y_sep = y[:, j] - y[:, j].reshape(-1, 1)
+        z_sep = z[:, j] - z[:, j].reshape(-1, 1)
+
+        np.fill_diagonal(x_sep, np.inf)
+        np.fill_diagonal(y_sep, np.inf)
+        np.fill_diagonal(z_sep, np.inf)
 
         Us = (masses * masses.T
-              / np.sqrt(x_separation**2 + y_separation**2 + z_separation**2))
-        np.fill_diagonal(Us, 0)
+              / np.sqrt(x_sep**2 + y_sep**2 + z_sep**2))
 
-        U[:, j] = -GRAVITY * np.sum(Us, axis=0)
+        U[:, j] = -GRAVITY * np.sum(np.triu(Us), axis=0)
 
-    for m, *L in np.column_stack((masses[0], tot_ang_mom)):
-        momenta_ax.plot(times, L, label=f'm = {m}')
-    momenta_ax.plot(times, np.sum(tot_ang_mom, axis=0), label='Total')
+    momenta_ax.plot(times, L, label='Total')
 
-    for m, *E in np.column_stack((masses[0], U + T)):
-        energy_ax.plot(times, E, label=f'm = {m}')
-    energy_ax.plot(times, np.sum(U, axis=0), label='Total')
+    E = np.sum(U + T, axis=0)
+    energy_ax.plot(times, E / E[0] - 1, label='$E / E_0 - 1$')
 
     momenta_ax.legend()
     energy_ax.legend()
@@ -198,16 +183,16 @@ def draw_stats(masses, times, coords, *, axs=None, fig=None):
     energy_ax.set_title('Total Energy')
 
 
-def solve_for(file_name):
+def solve_for(file_name, calc=False):
     '''Solves the N-body problem for initial values in json file.'''
     # Vectorise the initial values and extract parameters
     masses, initial_values, tf, tmax = load_bodies_from_json(file_name)
 
-    hash_ = get_hash(initial_values, tf, tmax)
+    hash_ = get_hash(masses, initial_values, tf, tmax)
 
     # Load the trajectory from file if it has already been solved
     # Otherwise solve with initial conditions and write to file
-    if hash_ in parse_index(INDEX_FILE):
+    if hash_ in parse_index(INDEX_FILE) and not calc:
         print('Loading trajectories from file...')
         times, coords = load_data(DATA_DIR, hash_)
     else:
@@ -226,9 +211,10 @@ def solve_for(file_name):
         num_points = FRAMERATE * tf
         step = len(sol.t) // num_points
 
-        create_data_dir(DATA_DIR)
-        write_data(hash_, DATA_DIR, times, coords)
-        update_index(INDEX_FILE, hash_)
+        if not calc:
+            create_data_dir(DATA_DIR)
+            write_data(hash_, DATA_DIR, times, coords)
+            update_index(INDEX_FILE, hash_)
 
     return masses, times, coords, tf
 

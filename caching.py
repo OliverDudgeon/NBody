@@ -30,15 +30,15 @@ def parse_index(index_file):
             return json.loads(dump_str)
 
 
-def get_hash(initial_values, tf, tmax):
+def get_hash(*args):
     '''
     Calc hashed representation of initial values.
     In order to identify if the initial conditions / parameters have
     already been used.
     '''
     hasher = sha256()
-    dat = bytes(repr(initial_values) + repr(tf) + repr(tmax),
-                encoding='utf8')
+
+    dat = bytes(''.join(repr(a) for a in args), encoding='utf8')
     hasher.update(dat)
     return hasher.hexdigest()
 
