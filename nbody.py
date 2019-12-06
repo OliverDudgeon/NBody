@@ -53,11 +53,12 @@ def derivatives(masses, time, state):
     separations = np.array([q - np.array([q]).T for q in coords])
 
     cubed_separation = np.sum(separations**2, axis=0)**1.5
+
     np.fill_diagonal(cubed_separation, np.inf)
 
-    acceleration = (-GRAVITY
-                    * masses
-                    * np.sum(separations / cubed_separation, axis=1))
+    acceleration = -GRAVITY * np.sum(masses.T
+                                     * separations
+                                     / cubed_separation, axis=1)
 
     return np.concatenate([*speeds,
                            acceleration.reshape(acceleration.size)])
@@ -71,7 +72,10 @@ def load_bodies_from_json(file_name='bodies'):
     Returns tuple of masses and vectorised form of initial conditions
     '''
     with open(f'{file_name}.json', 'r') as bodies_handler:
-        dump = json.loads(bodies_handler.read())
+        try:
+            dump = json.loads(bodies_handler.read())
+        except json.decoder.JSONDecodeError:
+            raise SyntaxError(f'The file {file_name}.json has an error')
 
     initial_values = dump['initial_values']
 
@@ -86,7 +90,7 @@ def load_bodies_from_json(file_name='bodies'):
 
 
 def draw_bodies(masses, times, coords, *,
-                animate=False, tf=None, ax=None, fig=None):
+                animate=False, speed=1, tf=None, ax=None, fig=None):
     '''
     Plot trajectories of the bodies.
     * @param masses numpy array of the masses
@@ -115,12 +119,12 @@ def draw_bodies(masses, times, coords, *,
         print('Drawing...')
 
         toc = tic = time.time()
-        while toc - tic < tf:
+        while toc - tic < tf / speed:
             ax.clear()
             ax.set_xlim(np.min(x), np.max(x))
             ax.set_ylim(np.min(y), np.max(y))
 
-            idx = int(len(times) * (toc - tic) / tf)
+            idx = int(len(times) * (toc - tic) / (tf / speed))
             for j in range(n):
                 l, = ax.plot(x[j][:idx], y[j][:idx])
                 ax.plot(coords[j][idx], coords[n + j][idx], marker='o',
@@ -242,6 +246,6 @@ if __name__ == '__main__':
     masses, times, coords, tf = solve_for(file_name)
 
     draw_bodies(masses, times, coords, tf=tf, animate=True)
-    # draw_stats(masses, times, coords, rel_L=False)
+    draw_stats(masses, times, coords, rel_L=False)
 
     plt.show()
