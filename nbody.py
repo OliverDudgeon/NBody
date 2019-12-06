@@ -7,6 +7,7 @@ import time
 from functools import partial
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from scipy.integrate import solve_ivp
 
 from caching import *
@@ -89,8 +90,8 @@ def load_bodies_from_json(file_name='bodies'):
     return masses, np.concatenate(initial_state), dump['tf'], dump['tmax']
 
 
-def draw_bodies(masses, times, coords, *,
-                animate=False, speed=1, tf=None, ax=None, fig=None):
+def draw_bodies(masses, times, coords, *, dims=2, animate=False,
+                speed=1, tf=None, ax=None, fig=None):
     '''
     Plot trajectories of the bodies.
     * @param masses numpy array of the masses
@@ -107,7 +108,8 @@ def draw_bodies(masses, times, coords, *,
     x, y, z, *_ = np.split(coords, 2*d)
 
     if ax is None or fig is None:
-        fig, ax = plt.subplots()
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d' if dims == 3 else None)
     ax.margins(x=0, y=0)
 
     n = np.size(masses)
@@ -123,12 +125,20 @@ def draw_bodies(masses, times, coords, *,
             ax.clear()
             ax.set_xlim(np.min(x), np.max(x))
             ax.set_ylim(np.min(y), np.max(y))
+            if dims == 3:
+                ax.set_zlim(np.min(z), np.max(z))
 
             idx = int(len(times) * (toc - tic) / (tf / speed))
             for j in range(n):
-                l, = ax.plot(x[j][:idx], y[j][:idx])
-                ax.plot(coords[j][idx], coords[n + j][idx], marker='o',
-                        c=l.get_c())
+                if dims == 3:
+                    zs = z[j][:idx],
+                    zt = z[j][idx],
+                else:
+                    zs = zt = ()
+                l, = ax.plot(x[j][:idx], y[j][:idx], *zs)
+
+                ax.plot([coords[j][idx]], [coords[n + j][idx]], zt,
+                        marker='o', c=l.get_c())
 
             plt.pause(.03)
             toc = time.time()
@@ -245,7 +255,7 @@ if __name__ == '__main__':
     file_name = FILE_NAME
     masses, times, coords, tf = solve_for(file_name)
 
-    draw_bodies(masses, times, coords, tf=tf, animate=True)
-    draw_stats(masses, times, coords, rel_L=False)
+    draw_bodies(masses, times, coords, dims=3, tf=tf, animate=True)
+    # draw_stats(masses, times, coords, rel_L=False)
 
     plt.show()
