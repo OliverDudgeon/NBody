@@ -14,12 +14,10 @@ from caching import *
 from tools import pprint
 
 # Constants
-FILE_NAME = 'figureeight'
+FILE_NAME = 'hd142'
 
 DATA_DIR = 'data'
 INDEX_FILE = 'index'
-
-GRAVITY = 1
 
 d = 3
 m = 2*d  # Number of coordinates (2 position 2 speed)
@@ -40,9 +38,10 @@ def get_vars_from_state(state):
     return coords[:d], coords[d:2*d]
 
 
-def derivatives(masses, time, state):
+def derivatives(gravity, masses, time, state):
     '''
     Calculate the values of the speed and acceleration of each body.
+    * @param gravity Universal gravitational constant is chosen units
     * @param masses
     * @param time current time value
     * @param state vectorised list of variables
@@ -57,7 +56,7 @@ def derivatives(masses, time, state):
 
     np.fill_diagonal(cubed_separation, np.inf)
 
-    acceleration = -GRAVITY * np.sum(masses.T
+    acceleration = -gravity * np.sum(masses.T
                                      * separations
                                      / cubed_separation, axis=1)
 
@@ -87,7 +86,8 @@ def load_bodies_from_json(file_name='bodies'):
     initial_state = [[body[name] for body in initial_values]
                      for name in coord_names]
 
-    return masses, np.concatenate(initial_state), dump['tf'], dump['tmax']
+    return (dump['G'], masses, np.concatenate(initial_state), dump['tf'],
+            dump['tmax'])
 
 
 def draw_bodies(masses, times, coords, *, dims=2, animate=False,
@@ -125,6 +125,7 @@ def draw_bodies(masses, times, coords, *, dims=2, animate=False,
             ax.clear()
             ax.set_xlim(np.min(x), np.max(x))
             ax.set_ylim(np.min(y), np.max(y))
+            ax.axis('equal')
             if dims == 3:
                 ax.set_zlim(np.min(z), np.max(z))
 
@@ -151,10 +152,11 @@ def draw_bodies(masses, times, coords, *, dims=2, animate=False,
     ax.set_title('Trajectories')
 
 
-def draw_stats(masses, times, state, *, rel_L=True, rel_E=True,
+def draw_stats(gravity, masses, times, state, *, rel_L=True, rel_E=True,
                axs=None, fig=None):
     '''
     Calculate & plot the total energy and angular momenta for all times.
+    * @param gravity Universal gravitational constant is chosen units
     * @param masses numpy array of the masses
     * @param times numpy array of time values
     * @param coords numpy array of vectorised coordinates
@@ -190,7 +192,7 @@ def draw_stats(masses, times, state, *, rel_L=True, rel_E=True,
             np.fill_diagonal(s, np.inf)
 
         Us = masses * masses.T / np.sqrt(sum(s**2 for s in sep))
-        U[:, j] = -GRAVITY * np.sum(np.triu(Us), axis=0)
+        U[:, j] = -gravity * np.sum(np.triu(Us), axis=0)
 
     L = np.sqrt(np.sum(L_tot**2, axis=0))
     if rel_L:
@@ -217,9 +219,10 @@ def solve_for(file_name, calc=False):
     * @param Just (re)calculate even if there is a cashed version
     '''
     # Vectorise the initial values and extract parameters
-    masses, initial_values, tf, tmax = load_bodies_from_json(file_name)
+    gravity, masses, initial_values, tf, tmax = load_bodies_from_json(
+        file_name)
 
-    hash_ = get_hash(masses, initial_values, tf, tmax)
+    hash_ = get_hash(gravity, masses, initial_values, tf, tmax)
 
     # Load the trajectory from file if it has already been solved
     # Otherwise solve with initial conditions and write to file
@@ -229,7 +232,7 @@ def solve_for(file_name, calc=False):
     else:
         print('Calculating trajectories...')
 
-        d = partial(derivatives, masses)
+        d = partial(derivatives, gravity, masses)
 
         tic = time.time()
         sol = solve_ivp(d, [0, tf], initial_values, max_step=tmax)
@@ -247,15 +250,15 @@ def solve_for(file_name, calc=False):
             write_data(hash_, DATA_DIR, times, coords)
             update_index(INDEX_FILE, hash_)
 
-    return masses, times, coords, tf
+    return gravity, masses, times, coords, tf
 
 
 if __name__ == '__main__':
     # file_name = input('Initial values file name: ')
     file_name = FILE_NAME
-    masses, times, coords, tf = solve_for(file_name)
+    gravity, masses, times, coords, tf = solve_for(file_name)
 
-    draw_bodies(masses, times, coords, dims=3, tf=tf, animate=True)
-    # draw_stats(masses, times, coords, rel_L=False)
+    draw_bodies(masses, times, coords, tf=tf, animate=True, speed=1)
+    # draw_stats(gravity, masses, times, coords, rel_L=False)
 
     plt.show()
