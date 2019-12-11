@@ -5,6 +5,7 @@
   "python.linting.pycodestyleEnabled": true,
   "cSpell.words": [
     "loadtxt",
+    "mplot",
     "ncols",
     "ndarray",
     "ndmin",
@@ -13,9 +14,12 @@
     "savetxt",
     "stats",
     "tmax",
+    "triu",
     "tuples",
+    "tvals",
     "xlim",
-    "ylim"
+    "ylim",
+    "zlim"
   ],
   "python.linting.flake8Enabled": false
 }

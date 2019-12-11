@@ -11,6 +11,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.integrate import solve_ivp
 
 from caching import *
+from physics import derivatives, calc_total_energy, calc_total_ang_momentum
 from tools import pprint
 
 # Constants
@@ -35,32 +36,6 @@ def get_vars_from_state(state):
     '''
     coords = np.split(state, 2*d)
     return coords[:d], coords[d:2*d]
-
-
-def derivatives(gravity, masses, time, state):
-    '''
-    Calculate the values of the speed and acceleration of each body.
-    * @param gravity Universal gravitational constant is chosen units
-    * @param masses
-    * @param time current time value
-    * @param state vectorised list of variables
-
-    Returns Derivatives in vectorised form
-    '''
-    coords, speeds = get_vars_from_state(state)
-
-    separations = np.array([q - np.array([q]).T for q in coords])
-
-    cubed_separation = np.sum(separations**2, axis=0)**1.5
-
-    np.fill_diagonal(cubed_separation, np.inf)
-
-    acceleration = -gravity * np.sum(masses.T
-                                     * separations
-                                     / cubed_separation, axis=1)
-
-    return np.concatenate([*speeds,
-                           acceleration.reshape(acceleration.size)])
 
 
 def load_bodies_from_json(file_name='bodies'):
@@ -166,6 +141,7 @@ def draw_stats(gravity, masses, times, state, *, rel_L=True, rel_E=True,
     * @param ax axes to plot onto. First momenta, second energy
     * @param fig figure window to redraw
     '''
+
     if axs is None or fig is None:
         fig, (momenta_ax, energy_ax) = plt.subplots(ncols=2)
     else:
@@ -173,33 +149,17 @@ def draw_stats(gravity, masses, times, state, *, rel_L=True, rel_E=True,
     momenta_ax.margins(x=0)
     energy_ax.margins(x=0)
 
-    n = masses.size
+    E = calc_total_energy(gravity, d, masses, state)
+    L = calc_total_ang_momentum(d, masses, state)
 
-    x, y, z, vx, vy, vz = np.split(state, 2*d)
-    r = np.array([x, y, z])
-    speeds = np.array([vx, vy, vz])
-
-    Ls = np.cross(r, masses.T * speeds, axis=0)
-    L_tot = np.sum(Ls, axis=1)
-
-    T = .5 * masses.T * np.sum(speeds**2, axis=0)
-
-    U = np.zeros([n, len(times)])
-    for j in range(len(times)):
-        sep = [pos[:, j] - pos[:, j].reshape(-1, 1) for pos in r]
-        for s in sep:
-            np.fill_diagonal(s, np.inf)
-
-        Us = masses * masses.T / np.sqrt(sum(s**2 for s in sep))
-        U[:, j] = -gravity * np.sum(np.triu(Us), axis=0)
-
-    L = np.sqrt(np.sum(L_tot**2, axis=0))
-    if rel_L:
+    if rel_L and L[0] != 0:
         momenta_ax.plot(times, L / L[0] - 1, label='$L / L_0 - 1$')
+    elif L[0] == 0:
+        raise ValueError(
+            'First value of L is zero. Can\'t calculate relative change')
     else:
         momenta_ax.plot(times, L, label='$L$')
 
-    E = np.sum(U + T, axis=0)
     if rel_E:
         energy_ax.plot(times, E / E[0] - 1, label='$E / E_0 - 1$')
     else:
@@ -257,7 +217,7 @@ if __name__ == '__main__':
     # file_name = FILE_NAME
     gravity, masses, times, coords, tf = solve_for(file_name)
 
-    draw_bodies(masses, times, coords, tf=tf, animate=True, speed=1)
-    # draw_stats(gravity, masses, times, coords, rel_L=False)
+    draw_bodies(masses, times, coords, tf=tf, animate=True, speed=50)
+    draw_stats(gravity, masses, times, coords)
 
     plt.show()
