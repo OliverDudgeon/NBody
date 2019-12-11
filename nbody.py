@@ -14,13 +14,12 @@ from caching import *
 from tools import pprint
 
 # Constants
-FILE_NAME = 'hd142'
+# FILE_NAME = 'HD3651'
 
 DATA_DIR = 'data'
 INDEX_FILE = 'index'
 
 d = 3
-m = 2*d  # Number of coordinates (2 position 2 speed)
 FRAMERATE = 60  # Number of data points to be saved per unit time
 
 
@@ -254,8 +253,8 @@ def solve_for(file_name, calc=False):
 
 
 if __name__ == '__main__':
-    # file_name = input('Initial values file name: ')
-    file_name = FILE_NAME
+    file_name = input('Initial values file name: ')
+    # file_name = FILE_NAME
     gravity, masses, times, coords, tf = solve_for(file_name)
 
     draw_bodies(masses, times, coords, tf=tf, animate=True, speed=1)

@@ -4,3 +4,5 @@
 __pycache__/
 data/
 index.json
+radialdata/UID*
+radialdata/RADIAL.log
