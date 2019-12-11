@@ -152,11 +152,8 @@ def draw_stats(gravity, masses, times, state, *, rel_L=True, rel_E=True,
     E = calc_total_energy(gravity, d, masses, state)
     L = calc_total_ang_momentum(d, masses, state)
 
-    if rel_L and L[0] != 0:
+    if rel_L:
         momenta_ax.plot(times, L / L[0] - 1, label='$L / L_0 - 1$')
-    elif L[0] == 0:
-        raise ValueError(
-            'First value of L is zero. Can\'t calculate relative change')
     else:
         momenta_ax.plot(times, L, label='$L$')
 
@@ -217,7 +214,7 @@ if __name__ == '__main__':
     # file_name = FILE_NAME
     gravity, masses, times, coords, tf = solve_for(file_name)
 
-    draw_bodies(masses, times, coords, tf=tf, animate=True, speed=50)
+    draw_bodies(masses, times, coords, tf=tf, animate=True)
     draw_stats(gravity, masses, times, coords)
 
     plt.show()
