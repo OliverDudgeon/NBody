@@ -64,6 +64,44 @@ def format_masses_as_names(masses):
     return [f'$m_{i} = {m}$' for i, m in enumerate(masses)]
 
 
+def animate_plot(ax, dims, masses, names, x, y, z, times, tf, speed):
+    # Animate in real time, 1s == 1 time unit
+    toc = tic = time.time()
+    while toc - tic < tf / speed:
+        ax.clear()
+        ax.set_xlim(np.min(x), np.max(x))
+        ax.set_ylim(np.min(y), np.max(y))
+
+        if dims == 3:
+            z_min, z_max = np.min(z), np.max(z)
+            if not np.isclose(z_min, z_max):
+                ax.set_zlim(z_min, z_max)
+        else:
+            ax.axis('equal')
+
+        # Closest index in data to current time value
+        idx = int(len(times) * (toc - tic) / (tf / speed))
+        for j in range(masses.size):
+            # Optionally add z values if 3D plot is chosen
+            if dims == 3:
+                zs = z[j][:idx],
+                zt = [[z[j][idx]]]
+            else:
+                # Empty iterable results in nothing passed on broadcast
+                zs = zt = ()
+            l, = ax.plot(x[j][:idx], y[j][:idx], *zs)
+
+            # Use same colour from line in marker plot
+            ax.plot([coords[j][idx]], [coords[masses.size + j][idx]],
+                    *zt, marker='o', c=l.get_c(), label=names[j])
+
+        ax.legend()
+        ax.set_title('Trajectories')
+
+        plt.pause(1e-5)
+        toc = time.time()
+
+
 def draw_bodies(masses, times, state, *, names=None, dims=2, animate=False,
                 speed=1, tf=None, ax=None, fig=None):
     '''
@@ -96,49 +134,15 @@ def draw_bodies(masses, times, state, *, names=None, dims=2, animate=False,
     elif not all(names):
         names = format_masses_as_names(masses[0])
 
-    print(names)
-
+    print('Drawing...')
     if animate:
-        print('Drawing...')
-
-        # Animate in real time, 1s == 1 time unit
-        toc = tic = time.time()
-        while toc - tic < tf / speed:
-            ax.clear()
-            ax.set_xlim(np.min(x), np.max(x))
-            ax.set_ylim(np.min(y), np.max(y))
-            ax.axis('equal')
-
-            if dims == 3:
-                ax.set_zlim(np.min(z), np.max(z))
-
-            # Closest index in data to current time value
-            idx = int(len(times) * (toc - tic) / (tf / speed))
-            for j in range(masses.size):
-                # Optionally add z values if 3D plot is chosen
-                if dims == 3:
-                    zs = z[j][:idx],
-                    zt = [[z[j][idx]]]
-                else:
-                    # Empty iterable results in nothing passed on broadcast
-                    zs = zt = ()
-                l, = ax.plot(x[j][:idx], y[j][:idx], *zs)
-
-                # Use same colour from line in marker plot
-                ax.plot([coords[j][idx]], [coords[masses.size + j][idx]],
-                        *zt, marker='o', c=l.get_c(), label=names[j])
-
-                ax.legend()
-
-            plt.pause(1e-5)
-            toc = time.time()
-        print('Finished drawing')
+        animate_plot(ax, dims, masses, names, x, y, z, times, tf, speed)
     else:
         for j, m in enumerate(masses[0]):
-            ax.plot(coords[j], coords[masses.size + j], label=f'm = {m}')
+            ax.plot(coords[j], coords[masses.size + j], label=names[j])
         ax.legend()
-
-    ax.set_title('Trajectories')
+        ax.set_title('Trajectories')
+    print('Finished drawing')
 
 
 def draw_stats(gravity, masses, times, state, *, rel_L=True, rel_E=True,
@@ -230,7 +234,7 @@ if __name__ == '__main__':
     # file_name = FILE_NAME
     gravity, masses, times, coords, tf, names = solve_for(file_name)
 
-    draw_bodies(masses, times, coords, tf=tf, names=names, animate=True)
+    draw_bodies(masses, times, coords, tf=tf, names=names)
     draw_stats(gravity, masses, times, coords)
 
     plt.show()
