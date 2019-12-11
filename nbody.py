@@ -20,7 +20,7 @@ from tools import pprint
 DATA_DIR = 'data'
 INDEX_FILE = 'index'
 
-d = 3
+D = 3
 FRAMERATE = 60  # Number of data points to be saved per unit time
 
 
@@ -34,8 +34,8 @@ def get_vars_from_state(state):
 
     Returns Tuple of a positions list values and a speeds list
     '''
-    coords = np.split(state, 2*d)
-    return coords[:d], coords[d:2*d]
+    coords = np.split(state, 2*D)
+    return coords[:D], coords[D:2*D]
 
 
 def load_bodies_from_json(file_name='bodies'):
@@ -46,6 +46,7 @@ def load_bodies_from_json(file_name='bodies'):
     Returns tuple of masses and vectorised form of initial conditions
     '''
     with open(f'bodies/{file_name}.json', 'r') as bodies_handler:
+        # Catch any errors in the JSON files and alert
         try:
             dump = json.loads(bodies_handler.read())
         except json.decoder.JSONDecodeError:
@@ -55,22 +56,22 @@ def load_bodies_from_json(file_name='bodies'):
 
     masses = np.array([body['m'] for body in initial_values], ndmin=2)
 
-    coord_names = ['x', 'y', 'z', 'v0x', 'v0y', 'v0z']
+    labels = ['x', 'y', 'z', 'v0x', 'v0y', 'v0z']
 
-    initial_state = [[body[name] for body in initial_values]
-                     for name in coord_names]
+    # Vectorise initial values
+    initial_state = [[body[l] for body in initial_values] for l in labels]
 
     return (dump['G'], masses, np.concatenate(initial_state), dump['tf'],
             dump['tmax'])
 
 
-def draw_bodies(masses, times, coords, *, dims=2, animate=False,
+def draw_bodies(masses, times, state, *, dims=2, animate=False,
                 speed=1, tf=None, ax=None, fig=None):
     '''
     Plot trajectories of the bodies.
     * @param masses numpy array of the masses
     * @param times numpy array of time values
-    * @param coords numpy array of vectorised coordinates
+    * @param state numpy array of vectorised coordinates
         - rows are the coordinate index
         - columns are the time index
     * @param animate whether to animate the trajectories
@@ -79,14 +80,14 @@ def draw_bodies(masses, times, coords, *, dims=2, animate=False,
     * @param fig figure window to redraw
     '''
 
-    x, y, z, *_ = np.split(coords, 2*d)
+    # Extract the space coordinates from the state
+    x, y, z, *_ = np.split(state, 2*D)
 
+    # Allow passing of own axis to adjust plot
     if ax is None or fig is None:
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d' if dims == 3 else None)
     ax.margins(x=0, y=0)
-
-    n = np.size(masses)
 
     if animate and tf is None:
         raise ValueError('Provide duration tf to animate')
@@ -94,33 +95,39 @@ def draw_bodies(masses, times, coords, *, dims=2, animate=False,
     if animate:
         print('Drawing...')
 
+        # Animate in real time, 1s == 1 time unit
         toc = tic = time.time()
         while toc - tic < tf / speed:
             ax.clear()
             ax.set_xlim(np.min(x), np.max(x))
             ax.set_ylim(np.min(y), np.max(y))
             ax.axis('equal')
+
             if dims == 3:
                 ax.set_zlim(np.min(z), np.max(z))
 
+            # Closest index in data to current time value
             idx = int(len(times) * (toc - tic) / (tf / speed))
-            for j in range(n):
+            for j in range(masses.size):
+                # Optionally add z values if 3D plot is chosen
                 if dims == 3:
                     zs = z[j][:idx],
                     zt = z[j][idx],
                 else:
+                    # Empty iterable results in nothing passed on broadcast
                     zs = zt = ()
                 l, = ax.plot(x[j][:idx], y[j][:idx], *zs)
 
-                ax.plot([coords[j][idx]], [coords[n + j][idx]], zt,
-                        marker='o', c=l.get_c())
+                # Use same colour from line in marker plot
+                ax.plot([coords[j][idx]], [coords[masses.size + j][idx]],
+                        zt, marker='o', c=l.get_c())
 
-            plt.pause(.03)
+            plt.pause(1e-5)
             toc = time.time()
         print('Finished drawing')
     else:
         for j, m in enumerate(masses[0]):
-            ax.plot(coords[j], coords[n + j], label=f'm = {m}')
+            ax.plot(coords[j], coords[masses.size + j], label=f'm = {m}')
         ax.legend()
 
     ax.set_title('Trajectories')
@@ -149,8 +156,8 @@ def draw_stats(gravity, masses, times, state, *, rel_L=True, rel_E=True,
     momenta_ax.margins(x=0)
     energy_ax.margins(x=0)
 
-    E = calc_total_energy(gravity, d, masses, state)
-    L = calc_total_ang_momentum(d, masses, state)
+    E = calc_total_energy(gravity, D, masses, state)
+    L = calc_total_ang_momentum(D, masses, state)
 
     if rel_L:
         momenta_ax.plot(times, L / L[0] - 1, label='$L / L_0 - 1$')
@@ -171,8 +178,8 @@ def draw_stats(gravity, masses, times, state, *, rel_L=True, rel_E=True,
 def solve_for(file_name, calc=False):
     '''
     Solves the N-body problem for initial values in json file.
-    * @param file_name name of file without extension to get initial value from
-    * @param Just (re)calculate even if there is a cashed version
+    * @param file_name path without extension to extract initial values
+    * @param calc (Re)Calculate even if there is a cashed version
     '''
     # Vectorise the initial values and extract parameters
     gravity, masses, initial_values, tf, tmax = load_bodies_from_json(
