@@ -6,3 +6,9 @@ data/
 index.json
 radialdata/UID*
 radialdata/RADIAL.log
+report/main.pdf
+report/__latexindent_temp.tex
+report/main.bcf
+report/main.pdf
+report/main.run.xml
+report/main.synctex.gz
