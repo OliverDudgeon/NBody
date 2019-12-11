@@ -1,0 +1,98 @@
+\documentclass{physics_article_B}
+
+\mytitle{Perovskite Solar Cells}
+\studentid{}
+\date{\today}
+
+\addbibresource{ProjectB Article 2.bib}
+
+\usepackage{lipsum}
+
+\setlength{\columnsep}{0.7cm}
+
+\begin{document}
+\maketitle
+
+\section*{Introduction}
+Commercial silicon solar panels you are able to buy today are only around 16\% efficient \cite{extance_reality_2019}. The climate crisis is driving the development of new types of solar cells --- the unit from which solar panels are constructed. This article discusses perovskites: a type of material that you may find in the solar panels you see around you soon. These can be at a lower cost and be more efficient. First, I recap the the function of typical solar cells; then I outline the designs of perovskite cells; then finally I discuss the potential issues with perovskites.
+
+\section*{Typical Solar Cells}
+
+Typical solar cells function like light-emitting diodes, but in reverse. I explain the construction of diodes in \cref{fig:pnjunction}. During the formation of the p-n junction, there is a net transport of charge from the n-type to the p-type. The n-type has become slightly positive whereas the p-type has become slightly negative. This results in an electric field across the device \cite{zhang_device_2017}. Usually, this is connected to a power supply and the built-in field causes the properties of diodes. However, if instead you connect it to some load then it can create an electric current when you shine a light on it. The light will excite electrons from the valance band to the conduction band from where the charges are free to be transported throughout the lattice \cite{zhang_device_2017}.
+
+\begin{figure}[h]
+ \centering
+ \includegraphics[width=0.5\linewidth]{pnjunction.png}
+ \caption{Silicon can be doped to have either an excess of electrons or an excess of holes (absences of electrons). These are referred to as n-types and p-types respectively \cite{zhang_device_2017}. When you bring pieces of n-type and p-type into contact, a p-n junction, the excited charges near the boundary can diffuse. Each excited electron can combine with a hole and causes the electron to de-excite. This results in a region around the boundary where there are no excess electrons or holes --- the depletion zone \cite{zhang_device_2017}.}
+ \label{fig:pnjunction}
+\end{figure}
+
+The transport is due to two mechanisms: drift and diffusion. Drift is due to the forces applied from the electric field across the device. Diffusion is due to the charge concentration gradient \cite{zhang_device_2017}. The efficiency of a solar cell is ultimately dependent on the rate that charge reaches the electrodes before recombination. This is quantified in the transport equation \cite{zhang_device_2017}:
+
+\begin{equation}
+ \label{eq:transport}
+ \pd{n}{ t} = D'\pd[2]{n}{ x} + \mu E\pd{n}{x} + G - R
+\end{equation}
+
+where $n$ is the population of excess electrons, $D'$ is a diffusion coefficient related to the Einstein relation, $\mu'$ is the mobility, $E$ is the electric field strength, $G$ is the generation rate and $R$ the recombination rate. The first term governs the diffusion rate and the second the drift rate. To gain insight into the diffusion term, I ignore the the drift and generation terms then \cref{eq:transport} I can rewrite the transport equation as \cite{zhang_device_2017}:
+
+\begin{equation}
+ \label{eq:diffusion_rate}
+ \pd{n}{ t} = D'\pd[2]{n}{ x} - \frac{n}{\tau}
+\end{equation}
+
+where I have rewritten $R$ in terms of $\tau$ --- the mean lifetime of charges. The solutions to this have an exponential dependence on position:
+
+\begin{equation}
+ \label{eq:diffusion_pop}
+ n \propto e^{-x/L}
+\end{equation}
+
+where I have defined the minority diffusion length as $L = \sqrt{D'\tau}$ \cite{zhang_device_2017} and this characterises the distance charges travel before recombination. Therefore, a successful solar cell needs a large electric field and high mobility for the drift term. Furthermore, a large diffusion length improves the diffusion term.
+
+\section*{Perovskites}
+
+\begin{figure}[H]
+ \centering
+ \begin{minipage}{0.45\textwidth}
+ \centering
+ \includegraphics[width=\linewidth]{Perovskite-crystal.png}
+ \caption{Typical perovskite \ce{ABX3} crystal structure \cite{noauthor_figure_nodate}. The \ce{X} halide ions form octahedra around the B cations. At the body centres is an \ce{A} cation. }
+ \label{fig:perovskite_crystal}
+ \end{minipage}
+ \hfill
+ \begin{minipage}{0.45\textwidth}
+ \centering
+ \includegraphics[width=\linewidth]{cell.pdf}
+ \caption{A perovskite solar cell is constructed by sandwiching a piece of the chosen perovskite between an n-type and p-type semiconductor \cite{zhang_device_2017}. These materials shuttle the charges to the electrodes. The top of the cell has transparent and conductive film. This is one of the electrodes. The other electrode is placed under the device \cite{extance_reality_2019}.}
+ \label{fig:cell_design}
+ \end{minipage}
+\end{figure}
+
+Perovskites refer to compounds with the general structure \ce{ABX3} where A and B are cations and X is a halide \cite{extance_reality_2019}. The crystal structure of perovskites is shown in \cref{fig:perovskite_crystal}. An example used readily is \ce{CH3NH3PbI3} \cite{hsiao_fundamental_2015} but many other combinations of ions exist and these all have varying electrical properties.
+
+\begin{figure}[t]
+ \centering
+ \includegraphics[width=0.5\linewidth]{nrelunlockin.jpg}
+ \caption{A strength of perovskites is a tunable bandgap, the energy difference between the valance and conduction bands \cite{saliba_cesium-containing_2016}. This allows control of the wavelengths of light that are absorbed. The image \cite{scanlon_unlocking_nodate}, from perovskite researcher Dennis Schroeder, is three different solar cells prepared with different halide contents resulting in the colour differences.}
+ \label{fig:halides}
+\end{figure}
+
+You can construct a perovskite cell according to the layers in \cref{fig:cell_design}. Perovskites tend to have a large diffusion length, in the $\mathrm{\mu m}$ range \cite{saliba_cesium-containing_2016}. They also have a tunable bandgap (see \cref{fig:halides}). These two properties are what makes perovskites suitable for solar cells.
+
+One major benefit of perovskite cells is that you can be fabricate them in many different, often cheaper, ways. For example, dip coating and ink-jet printing (the same technology that many printers use) are both a much simpler process compared to the high temperatures (3, 000 \degree C) and acidic conditions required if you were to manufacture silicon cells \cite{saliba_cesium-containing_2016}.
+
+\section*{Problems with Perovskites}
+Perovskites have relatively high efficiencies at around 21\% \cite{extance_reality_2019}, at least on the lab scale. All solar cells can obtain high efficiencies if the cells are sufficiency small. This is partly due to how the diffusion lengths compare to the size of the cell but also how the resistance of the cells scales up. In reality, when many cells are combined or larger cells are made, the efficiency falls significantly. This is currently preventing commercial perovskite cells.
+
+Furthermore, the most popular perovskite \ce{CH3NH3PbI3} contains toxic lead ions. However, a manufacture of perovskite cells, Oxford PV, argue that the overall impact on the environment from the production of silicon cells is worse than the potential impact from lead-containing perovskites \cite{extance_reality_2019}.
+
+There are also concerns with their durability. Temperature and humidity are two factors that solar cell must be able to cope with. These factors tend to have negative effects on the efficiency and long term lifespan of perovskite cells. Temperature changes can temporarily lower the efficiency of cells and humidity can cause structural changes which lead to device failure. Typically, all solar cells have variations but perovskites cells seem to experience this worse \cite{extance_reality_2019}.
+
+\section*{Conclusion}
+Many companies aim to have commercial cells available next year. Oxford PV aims to have 27\% efficient cells \cite{extance_reality_2019}. This is remarkable as the theoretical efficiency of silicon and perovskite cells is 30\% and current commercial cells have efficiencies of 16\% \cite{extance_reality_2019}. These cells do appear to need more research into their suitability due to the lead concerns and into their durability due to variations.
+
+
+\printbibliography
+
+\end{document}
