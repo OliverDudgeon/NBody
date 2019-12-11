@@ -5,7 +5,20 @@ Functions to calculate physical values related to the N-body problem.
 import numpy as np
 
 
-def derivatives(gravity, masses, time, state):
+def get_vars_from_state(d, state):
+    '''
+    Slice state into coords and speeds.
+    Coords and speed are split into x, y, z components within the lists.
+    * @param state Array of corrdinates in vector form. Length must be
+        integer multiples of m.
+
+    Returns Tuple of a positions list values and a speeds list
+    '''
+    coords = np.split(state, 2*d)
+    return coords[:d], coords[d:2*d]
+
+
+def derivatives(d, gravity, masses, time, state):
     '''
     Calculate the values of the speed and acceleration of each body.
     * @param gravity Universal gravitational constant is chosen units
@@ -15,12 +28,16 @@ def derivatives(gravity, masses, time, state):
 
     Returns Derivatives in vectorised form
     '''
-    coords, speeds = get_vars_from_state(state)
+    coords, speeds = get_vars_from_state(d, state)
 
+    # q - q.T computes separations as a matrix if q is the 1D array
+    # of position values for the bodies (for a given dimension).
     separations = np.array([q - np.array([q]).T for q in coords])
 
     cubed_separation = np.sum(separations**2, axis=0)**1.5
 
+    # Replace the zeros with inf to avoid 0/0 error and so force on a
+    # particle due to itself is zero.
     np.fill_diagonal(cubed_separation, np.inf)
 
     acceleration = -gravity * np.sum(masses.T
@@ -53,14 +70,16 @@ def calc_total_energy(gravity, d, masses, state):
     '''
 
     r, speeds = split_state_into_coords(state, d)
-    _, num_tvals = state.shape
+    _, num_tvals = state.shape  # Length of state and times is equal
 
     T = .5 * masses.T * np.sum(speeds**2, axis=0)
 
     U = np.zeros([masses.size, num_tvals])
     for j in range(num_tvals):
+        # Reshape 1D array into 2D column vector
         sep = [pos[:, j] - pos[:, j].reshape(-1, 1) for pos in r]
         for s in sep:
+            # Stop 0/0 errors
             np.fill_diagonal(s, np.inf)
 
         Us = masses * masses.T / np.sqrt(sum(s**2 for s in sep))
@@ -83,6 +102,7 @@ def calc_total_ang_momentum(d, masses, state):
     r = np.array([x, y, z])
     speeds = np.array([vx, vy, vz])
 
+    # Angular momentum = r x mv
     Ls = np.cross(r, masses.T * speeds, axis=0)
     L_tot = np.sum(Ls, axis=1)
 

@@ -1,6 +1,6 @@
 {
   "tmax": 0.001,
-  "tf": 20,
+  "tf": 21,
   "G": 1,
   "initial_values": [
     {

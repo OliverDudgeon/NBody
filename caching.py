@@ -20,7 +20,7 @@ def create_data_dir(data_dir):
 
 
 def parse_index(index_file):
-    '''Parse and return the index file.'''
+    '''Parse and return the parsed index file.'''
     create_index(index_file)
     with open('index.json') as index_handler:
         dump_str = index_handler.read()

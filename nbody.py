@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.integrate import solve_ivp
 
-from caching import *
+import caching
 from physics import derivatives, calc_total_energy, calc_total_ang_momentum
 from tools import pprint
 
@@ -20,22 +20,10 @@ from tools import pprint
 DATA_DIR = 'data'
 INDEX_FILE = 'index'
 
-D = 3
-FRAMERATE = 60  # Number of data points to be saved per unit time
+D = 3  # Number of spatial dimensions
 
 
 # Functions
-def get_vars_from_state(state):
-    '''
-    Slice state into coords and speeds.
-    Coords and speed are split into x, y, z components within the lists.
-    * @param state Array of corrdinates in vector form. Length must be
-        integer multiples of m.
-
-    Returns Tuple of a positions list values and a speeds list
-    '''
-    coords = np.split(state, 2*D)
-    return coords[:D], coords[D:2*D]
 
 
 def load_bodies_from_json(file_name='bodies'):
@@ -55,6 +43,7 @@ def load_bodies_from_json(file_name='bodies'):
     initial_values = dump['initial_values']
 
     masses = np.array([body['m'] for body in initial_values], ndmin=2)
+    names = np.array([body.get('name') for body in initial_values])
 
     labels = ['x', 'y', 'z', 'v0x', 'v0y', 'v0z']
 
@@ -62,10 +51,20 @@ def load_bodies_from_json(file_name='bodies'):
     initial_state = [[body[l] for body in initial_values] for l in labels]
 
     return (dump['G'], masses, np.concatenate(initial_state), dump['tf'],
-            dump['tmax'])
+            dump['tmax'], names)
 
 
-def draw_bodies(masses, times, state, *, dims=2, animate=False,
+def format_masses_as_names(masses):
+    '''
+    Format masses values for legend labels.
+    * @param masses iterable of mass values
+
+    Returns Iterable of str
+    '''
+    return [f'$m_{i} = {m}$' for i, m in enumerate(masses)]
+
+
+def draw_bodies(masses, times, state, *, names=None, dims=2, animate=False,
                 speed=1, tf=None, ax=None, fig=None):
     '''
     Plot trajectories of the bodies.
@@ -92,6 +91,13 @@ def draw_bodies(masses, times, state, *, dims=2, animate=False,
     if animate and tf is None:
         raise ValueError('Provide duration tf to animate')
 
+    if names is None:
+        names = format_masses_as_names(masses[0])
+    elif not all(names):
+        names = format_masses_as_names(masses[0])
+
+    print(names)
+
     if animate:
         print('Drawing...')
 
@@ -112,7 +118,7 @@ def draw_bodies(masses, times, state, *, dims=2, animate=False,
                 # Optionally add z values if 3D plot is chosen
                 if dims == 3:
                     zs = z[j][:idx],
-                    zt = z[j][idx],
+                    zt = [[z[j][idx]]]
                 else:
                     # Empty iterable results in nothing passed on broadcast
                     zs = zt = ()
@@ -120,7 +126,9 @@ def draw_bodies(masses, times, state, *, dims=2, animate=False,
 
                 # Use same colour from line in marker plot
                 ax.plot([coords[j][idx]], [coords[masses.size + j][idx]],
-                        zt, marker='o', c=l.get_c())
+                        *zt, marker='o', c=l.get_c(), label=names[j])
+
+                ax.legend()
 
             plt.pause(1e-5)
             toc = time.time()
@@ -182,20 +190,24 @@ def solve_for(file_name, calc=False):
     * @param calc (Re)Calculate even if there is a cashed version
     '''
     # Vectorise the initial values and extract parameters
-    gravity, masses, initial_values, tf, tmax = load_bodies_from_json(
-        file_name)
+    (gravity,
+     masses,
+     initial_values,
+     tf,
+     tmax,
+     names) = load_bodies_from_json(file_name)
 
-    hash_ = get_hash(gravity, masses, initial_values, tf, tmax)
+    hash_ = caching.get_hash(gravity, masses, initial_values, tf, tmax)
 
     # Load the trajectory from file if it has already been solved
     # Otherwise solve with initial conditions and write to file
-    if hash_ in parse_index(INDEX_FILE) and not calc:
+    if hash_ in caching.parse_index(INDEX_FILE) and not calc:
         print('Loading trajectories from file...')
-        times, coords = load_data(DATA_DIR, hash_)
+        times, coords = caching.load_data(DATA_DIR, hash_)
     else:
         print('Calculating trajectories...')
 
-        d = partial(derivatives, gravity, masses)
+        d = partial(derivatives, D, gravity, masses)
 
         tic = time.time()
         sol = solve_ivp(d, [0, tf], initial_values, max_step=tmax)
@@ -205,23 +217,20 @@ def solve_for(file_name, calc=False):
         times = sol.t
         coords = sol.y
 
-        num_points = FRAMERATE * tf
-        step = len(sol.t) // num_points
-
         if not calc:
-            create_data_dir(DATA_DIR)
-            write_data(hash_, DATA_DIR, times, coords)
-            update_index(INDEX_FILE, hash_)
+            caching.create_data_dir(DATA_DIR)
+            caching.write_data(hash_, DATA_DIR, times, coords)
+            caching.update_index(INDEX_FILE, hash_)
 
-    return gravity, masses, times, coords, tf
+    return gravity, masses, times, coords, tf, names
 
 
 if __name__ == '__main__':
     file_name = input('Initial values file name: ')
     # file_name = FILE_NAME
-    gravity, masses, times, coords, tf = solve_for(file_name)
+    gravity, masses, times, coords, tf, names = solve_for(file_name)
 
-    draw_bodies(masses, times, coords, tf=tf, animate=True)
+    draw_bodies(masses, times, coords, tf=tf, names=names, animate=True)
     draw_stats(gravity, masses, times, coords)
 
     plt.show()
