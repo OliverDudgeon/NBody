@@ -70,7 +70,7 @@ def load_bodies_from_json(file_name='bodies'):
 
     Returns tuple of masses and vectorised form of initial conditions
     '''
-    with open(f'{file_name}.json', 'r') as bodies_handler:
+    with open(f'bodies/{file_name}.json', 'r') as bodies_handler:
         try:
             dump = json.loads(bodies_handler.read())
         except json.decoder.JSONDecodeError:
