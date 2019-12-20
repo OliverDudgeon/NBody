@@ -3,6 +3,7 @@
   "python.linting.mypyEnabled": false,
   "python.linting.enabled": true,
   "python.linting.pycodestyleEnabled": true,
+  "workbench.colorTheme": "Default Dark+",
   "cSpell.words": [
     "loadtxt",
     "mplot",

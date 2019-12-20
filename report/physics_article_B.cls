@@ -43,6 +43,8 @@
 
 \RequirePackage{color}
 \RequirePackage{listings}
+\RequirePackage{tabularx}
+\RequirePackage{svg}
 \RequirePackage{mhchem}
 \RequirePackage{pgfplots}
 \pgfplotsset{compat=1.16}
@@ -78,7 +80,7 @@
 %\def\myname#1{\gdef\@myname{#1}}
 \def\mytitle#1{\gdef\@mytitle{#1}}
 
-\lhead{Student ID: \@studentid}
+\lhead{ID: \@studentid}
 \chead{}
 \rhead{\leftmark}
 \lfoot{}

@@ -11,12 +11,12 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.integrate import solve_ivp
 
 import caching
+# Import main physical functions from dedicated module
 from physics import derivatives, calc_total_energy, calc_total_ang_momentum
 from tools import pprint
 
 # Constants
 # FILE_NAME = 'HD3651'
-
 DATA_DIR = 'data'
 INDEX_FILE = 'index'
 
@@ -96,7 +96,6 @@ def animate_plot(ax, dims, masses, names, x, y, z, times, tf, speed):
                     *zt, marker='o', c=l.get_c(), label=names[j])
 
         ax.legend()
-        ax.set_title('Trajectories')
 
         plt.pause(1e-5)
         toc = time.time()
